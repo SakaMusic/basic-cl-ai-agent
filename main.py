@@ -1,10 +1,12 @@
-import os, argparse
+import os, argparse, sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from prompts import system_prompt
 from call_function import available_functions, call_function
 
+
+MAX_ITERATIONS = 20
 
 def main():
     load_dotenv()
@@ -23,42 +25,56 @@ def main():
     
     # Instantiate AI agent
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=messages,
-        config=types.GenerateContentConfig(system_instruction=system_prompt,
-                                        #    temperature=0,
-                                           tools=[available_functions]
-                                           )
-    )
 
-    if response.usage_metadata is not None:
-        if args.verbose == True:
-            print(f"User prompt: {args.user_prompt}")
-            print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-            print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-    else:
-        raise RuntimeError("Failed API request, no response metadata")
-    
-    function_results = []
-
-    if response.function_calls:
-        for fc in response.function_calls:
-            function_call_result = call_function(fc, verbose=args.verbose)
-        
-            if len(function_call_result.parts) == 0:
-                raise Exception("Error: empty parts list")
-            if function_call_result.parts[0].function_response == None:
-                raise Exception("Error: Expected FunctionResponse object, received None")
-            if function_call_result.parts[0].function_response.response == None:
-                raise Exception("Error: Expected function result, recieved None")
+    for _ in range(MAX_ITERATIONS):
+        function_results = []
             
-            function_results.append(function_call_result.parts[0])
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=messages,
+            config=types.GenerateContentConfig(system_instruction=system_prompt,
+                                            #    temperature=0,
+                                            tools=[available_functions]
+                                            )
+        )
+        
+        # adding previous AI response back to message list
+        if response.candidates:
+            for interaction in response.candidates:
+                messages.append(interaction.content)
 
-            if args.verbose:
-                print(f"-> {function_call_result.parts[0].function_response.response}")
-    else:
-        print(response.text)
+        if response.usage_metadata is not None:
+            if args.verbose == True:
+                print(f"User prompt: {args.user_prompt}")
+                print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+                print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+        else:
+            raise RuntimeError("Failed API request, no response metadata")
+        
+
+        if response.function_calls:
+            for fc in response.function_calls:
+                function_call_result = call_function(fc, verbose=args.verbose)
+            
+                if len(function_call_result.parts) == 0:
+                    raise Exception("Error: empty parts list")
+                if function_call_result.parts[0].function_response == None:
+                    raise Exception("Error: Expected FunctionResponse object, received None")
+                if function_call_result.parts[0].function_response.response == None:
+                    raise Exception("Error: Expected function result, recieved None")
+                
+                function_results.append(function_call_result.parts[0])
+
+                if args.verbose:
+                    print(f"-> {function_call_result.parts[0].function_response.response}")
+            if function_results:   
+                messages.append(types.Content(role="user", parts=function_results))
+        else:
+            print(response.text)
+            return
+    
+    print("ERROR: Max iterations reached with no final response.")
+    sys.exit(1)
 
 if __name__ == "__main__":
     main()
