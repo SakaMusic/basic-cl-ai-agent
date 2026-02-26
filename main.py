@@ -3,13 +3,13 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from prompts import system_prompt
-from functions.call_function import available_functions
+from call_function import available_functions, call_function
 
 
 def main():
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key == None:
+    if api_key is None:
         raise RuntimeError("api key has not been found in .env")
     
     # Get user prompt
@@ -32,7 +32,7 @@ def main():
                                            )
     )
 
-    if response.usage_metadata != None:
+    if response.usage_metadata is not None:
         if args.verbose == True:
             print(f"User prompt: {args.user_prompt}")
             print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
@@ -40,9 +40,23 @@ def main():
     else:
         raise RuntimeError("Failed API request, no response metadata")
     
-    if response.function_calls != None:
-        for item in response.function_calls:
-            print(f"Calling function: {item.name}({item.args})")
+    function_results = []
+
+    if response.function_calls:
+        for fc in response.function_calls:
+            function_call_result = call_function(fc, verbose=args.verbose)
+        
+            if len(function_call_result.parts) == 0:
+                raise Exception("Error: empty parts list")
+            if function_call_result.parts[0].function_response == None:
+                raise Exception("Error: Expected FunctionResponse object, received None")
+            if function_call_result.parts[0].function_response.response == None:
+                raise Exception("Error: Expected function result, recieved None")
+            
+            function_results.append(function_call_result.parts[0])
+
+            if args.verbose:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
     else:
         print(response.text)
 

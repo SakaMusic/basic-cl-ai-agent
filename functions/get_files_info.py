@@ -39,58 +39,5 @@ schema_get_files_info = types.FunctionDeclaration(
     ),
 )
 
-schema_get_file_content = types.FunctionDeclaration(
-    name="get_file_content",
-    description="Lists content of a file",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="path to the file"
-            )
-        },
-        required=["file_path"]
-    )
-)
 
-schema_write_file = types.FunctionDeclaration(
-    name="write_file",
-    description="Write to a file",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="path to the file"
-            ),
-            "content": types.Schema(
-                type=types.Type.STRING,
-                description="contents of file"
-            )
-        },
-        required=["file_path", "content"]
-    )
-)
 
-schema_run_python_file = types.FunctionDeclaration(
-    name="run_python_file",
-    description="Run a python file",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="path to the file"
-            ),
-            "args": types.Schema(
-                type=types.Type.ARRAY,
-                items=types.Schema(
-                    type=types.Type.STRING,
-                ),
-                description="Array of arguments"
-            )
-        },
-        required=["file_path"]
-    )
-)
