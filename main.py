@@ -2,7 +2,8 @@ import os, argparse
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
+from prompts import system_prompt
+from functions.call_function import available_functions
 
 
 def main():
@@ -23,7 +24,12 @@ def main():
     # Instantiate AI agent
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=messages
+        model="gemini-2.5-flash",
+        contents=messages,
+        config=types.GenerateContentConfig(system_instruction=system_prompt,
+                                        #    temperature=0,
+                                           tools=[available_functions]
+                                           )
     )
 
     if response.usage_metadata != None:
@@ -34,7 +40,11 @@ def main():
     else:
         raise RuntimeError("Failed API request, no response metadata")
     
-    print(response.text)
+    if response.function_calls != None:
+        for item in response.function_calls:
+            print(f"Calling function: {item.name}({item.args})")
+    else:
+        print(response.text)
 
 if __name__ == "__main__":
     main()
